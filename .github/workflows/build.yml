@@ -272,31 +272,32 @@ jobs:
 
           tmpfile="$(mktemp)"
 
-          # 헤더 추가 + 기존 내용 뒤에 이어붙이기
-          printf '%s\n' \
-'// Fallback definitions for KernelSU sucompat (added by CI)' \
-'// Fix for undeclared sh_path / ksud_path / su on newer GKI trees' \
-'#ifndef KSU_SUCOMPAT_PATHS_DEFINED' \
-'#define KSU_SUCOMPAT_PATHS_DEFINED' \
-'' \
-'#ifndef KSUD_PATH' \
-'#define KSUD_PATH "/data/adb/ksud"' \
-'#endif' \
-'' \
-'#ifndef SU_PATH' \
-'#define SU_PATH "/system/bin/su"' \
-'#endif' \
-'' \
-'static const char sh_path[]   = "/system/bin/sh";' \
-'static const char ksud_path[] = KSUD_PATH;' \
-'static const char su[]        = SU_PATH;' \
-'' \
-'#endif /* KSU_SUCOMPAT_PATHS_DEFINED */'           > "$tmpfile"
+          {
+            echo '// Fallback definitions for KernelSU sucompat (added by CI)'
+            echo '// Fix for undeclared sh_path / ksud_path / su on newer GKI trees'
+            echo '#ifndef KSU_SUCOMPAT_PATHS_DEFINED'
+            echo '#define KSU_SUCOMPAT_PATHS_DEFINED'
+            echo ''
+            echo '#ifndef KSUD_PATH'
+            echo '#define KSUD_PATH "/data/adb/ksud"'
+            echo '#endif'
+            echo ''
+            echo '#ifndef SU_PATH'
+            echo '#define SU_PATH "/system/bin/su"'
+            echo '#endif'
+            echo ''
+            echo 'static const char sh_path[]  = "/system/bin/sh";'
+            echo 'static const char ksud_path[] = KSUD_PATH;'
+            echo 'static const char su[]       = SU_PATH;'
+            echo ''
+            echo '#endif /* KSU_SUCOMPAT_PATHS_DEFINED */'
+            cat "$TARGET"
+          } > "$tmpfile"
 
-          cat "$TARGET" >> "$tmpfile"
           mv "$tmpfile" "$TARGET"
           echo "sucompat.c patch applied."
-- name: Apply Hooks Patches
+
+      - name: Apply Hooks Patches
         run: |
           cd "$CONFIG/common"
           cp ../../kernel_patches/wild/hooks/scope_min_manual_hooks_v1.4.patch ./
