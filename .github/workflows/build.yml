@@ -264,35 +264,41 @@ jobs:
             exit 0
           fi
 
-          # 이미 패치된 경우 중복으로 넣지 않기 위한 가드
+          # 이미 한 번 패치된 경우 중복 추가 방지
           if grep -q 'KSU_SUCOMPAT_PATHS_DEFINED' "$TARGET"; then
             echo "sucompat.c already contains KSU_SUCOMPAT_PATHS_DEFINED, skipping patch"
             exit 0
           fi
 
-          echo "Patching $TARGET ..."
-          cat << 'EOF' | sed -i '1r /dev/stdin' "$TARGET"
-// Fallback definitions for KernelSU sucompat (added by CI)
-// Fix for undeclared sh_path / ksud_path / su on newer GKI trees
-#ifndef KSU_SUCOMPAT_PATHS_DEFINED
-#define KSU_SUCOMPAT_PATHS_DEFINED
+          tmpfile="$(mktemp)"
 
-#ifndef KSUD_PATH
-#define KSUD_PATH "/data/adb/ksud"
-#endif
+          {
+            cat << 'EOF'
+            // Fallback definitions for KernelSU sucompat (added by CI)
+            // Fix for undeclared sh_path / ksud_path / su on newer GKI trees
+            #ifndef KSU_SUCOMPAT_PATHS_DEFINED
+            #define KSU_SUCOMPAT_PATHS_DEFINED
 
-#ifndef SU_PATH
-#define SU_PATH "/system/bin/su"
-#endif
+            #ifndef KSUD_PATH
+            #define KSUD_PATH "/data/adb/ksud"
+            #endif
 
-static const char sh_path[]   = "/system/bin/sh";
-static const char ksud_path[] = KSUD_PATH;
-static const char su[]        = SU_PATH;
+            #ifndef SU_PATH
+            #define SU_PATH "/system/bin/su"
+            #endif
 
-#endif /* KSU_SUCOMPAT_PATHS_DEFINED */
-EOF
+            static const char sh_path[]   = "/system/bin/sh";
+            static const char ksud_path[] = KSUD_PATH;
+            static const char su[]        = SU_PATH;
 
+            #endif /* KSU_SUCOMPAT_PATHS_DEFINED */
+            EOF
+            cat "$TARGET"
+          } > "$tmpfile"
+
+          mv "$tmpfile" "$TARGET"
           echo "sucompat.c patch applied."
+
 
 
       - name: Apply Hooks Patches
