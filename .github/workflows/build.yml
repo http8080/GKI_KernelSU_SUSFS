@@ -254,6 +254,25 @@ jobs:
           cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
           patch -p1 < fix_kernel_compat.c.patch
 
+      - name: Fix KernelSU core_hook CONFIG_KSU_SUSFS endif
+        run: |
+          cd "$CONFIG/common/drivers/kernelsu"
+
+          if [ ! -f core_hook.c ]; then
+            echo "core_hook.c not found, skipping"
+            exit 0
+          fi
+
+          # CONFIG_KSU_SUSFS 가 열려 있는데 닫는 #endif 가 없는 경우만 보정
+          if grep -q '#ifdef CONFIG_KSU_SUSFS' core_hook.c && \
+             ! tail -n 40 core_hook.c | grep -q '#endif /\* CONFIG_KSU_SUSFS \*/'; then
+            echo "" >> core_hook.c
+            echo "#endif /* CONFIG_KSU_SUSFS */" >> core_hook.c
+            echo "Added missing #endif for CONFIG_KSU_SUSFS in core_hook.c"
+          else
+            echo "No missing CONFIG_KSU_SUSFS endif detected in core_hook.c"
+          fi
+
       - name: Fix KernelSU sucompat constants (sh_path/ksud_path/su)
         run: |
           cd "$CONFIG"
