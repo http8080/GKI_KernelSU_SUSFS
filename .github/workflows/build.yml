@@ -316,6 +316,64 @@ jobs:
           mv "$tmpfile" "$TARGET"
           echo "sucompat.c patch applied."
 
+      # >>> NEW: undefined symbol ksu_access_ok fix <<<
+      - name: Fix KernelSU ksu_access_ok symbol
+        run: |
+          cd "$CONFIG"
+
+          # ksu_access_ok를 아예 안 쓰면 스킵
+          if ! grep -R "ksu_access_ok" common/drivers/kernelsu >/dev/null 2>&1; then
+            echo "ksu_access_ok not referenced in drivers/kernelsu, skipping helper"
+            exit 0
+          fi
+
+          # 이미 어디선가 구현되어 있으면 스킵
+          if grep -R "ksu_access_ok(const void \\*addr" common/drivers/kernelsu >/dev/null 2>&1; then
+            echo "ksu_access_ok implementation already exists, skipping helper"
+            exit 0
+          fi
+
+          TARGET="./common/drivers/kernelsu/kernel_compat.c"
+          if [ ! -f "$TARGET" ]; then
+            echo "kernel_compat.c not found under common/drivers/kernelsu, skipping helper"
+            exit 0
+          fi
+
+          echo "Injecting fallback ksu_access_ok implementation into kernel_compat.c"
+          printf '\n/* Fallback implementation added by CI:\n' >> "$TARGET"
+          printf ' * Some SUSFS/KSU combos expect ksu_access_ok() but do not provide it.\n' >> "$TARGET"
+          printf ' * Map it to the kernel access_ok() helper.\n */\n' >> "$TARGET"
+          printf 'int ksu_access_ok(const void *addr, unsigned long size)\n' >> "$TARGET"
+          printf '{\n' >> "$TARGET"
+          printf '    return access_ok((unsigned long)addr, size);\n' >> "$TARGET"
+          printf '}\n' >> "$TARGET"
+
+
+      # >>> NEW: unterminated #ifdef CONFIG_KSU_SUSFS in core_hook.c fix <<<
+      - name: Fix KernelSU core_hook SUSFS ifdef
+        run: |
+          cd "$CONFIG"
+          FILE="./common/drivers/kernelsu/core_hook.c"
+
+          if [ ! -f "$FILE" ]; then
+            echo "core_hook.c not found under common/drivers/kernelsu, skipping"
+            exit 0
+          fi
+
+          # CONFIG_KSU_SUSFS는 쓰는데, 해당하는 #endif /* CONFIG_KSU_SUSFS */가 없으면 하나 추가
+          if grep -q "CONFIG_KSU_SUSFS" "$FILE"; then
+            if ! grep -q "#endif /\* CONFIG_KSU_SUSFS \*/" "$FILE"; then
+              echo "" >> "$FILE"
+              echo "#endif /* CONFIG_KSU_SUSFS */" >> "$FILE"
+              echo "Added missing #endif for CONFIG_KSU_SUSFS in core_hook.c"
+            else
+              echo "core_hook.c already has CONFIG_KSU_SUSFS endif, skipping"
+            fi
+          else
+            echo "CONFIG_KSU_SUSFS not referenced in core_hook.c, skipping"
+          fi
+
+
       - name: Apply Hooks Patches
         run: |
           cd "$CONFIG/common"
