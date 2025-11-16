@@ -254,6 +254,47 @@ jobs:
           cp ../../kernel_patches/wild/susfs_fix_patches/v${SUSFS_VERSION}/fix_kernel_compat.c.patch ./
           patch -p1 < fix_kernel_compat.c.patch
 
+      - name: Fix KernelSU sucompat constants (sh_path/ksud_path/su)
+        run: |
+          cd "$CONFIG"
+          TARGET="./common/drivers/kernelsu/sucompat.c"
+
+          if [ ! -f "$TARGET" ]; then
+            echo "sucompat.c not found under common/drivers/kernelsu, skipping patch"
+            exit 0
+          fi
+
+          # 이미 패치된 경우 중복으로 넣지 않기 위한 가드
+          if grep -q 'KSU_SUCOMPAT_PATHS_DEFINED' "$TARGET"; then
+            echo "sucompat.c already contains KSU_SUCOMPAT_PATHS_DEFINED, skipping patch"
+            exit 0
+          fi
+
+          echo "Patching $TARGET ..."
+          cat << 'EOF' | sed -i '1r /dev/stdin' "$TARGET"
+// Fallback definitions for KernelSU sucompat (added by CI)
+// Fix for undeclared sh_path / ksud_path / su on newer GKI trees
+#ifndef KSU_SUCOMPAT_PATHS_DEFINED
+#define KSU_SUCOMPAT_PATHS_DEFINED
+
+#ifndef KSUD_PATH
+#define KSUD_PATH "/data/adb/ksud"
+#endif
+
+#ifndef SU_PATH
+#define SU_PATH "/system/bin/su"
+#endif
+
+static const char sh_path[]   = "/system/bin/sh";
+static const char ksud_path[] = KSUD_PATH;
+static const char su[]        = SU_PATH;
+
+#endif /* KSU_SUCOMPAT_PATHS_DEFINED */
+EOF
+
+          echo "sucompat.c patch applied."
+
+
       - name: Apply Hooks Patches
         run: |
           cd "$CONFIG/common"
